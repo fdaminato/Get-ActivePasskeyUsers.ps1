@@ -14,7 +14,7 @@
         * Failure CSV, when applicable
         * Standalone interactive HTML dashboard
 
-## ⚡ Exemple 1
+## ⚡ Exemple
 
 ```bash
 
