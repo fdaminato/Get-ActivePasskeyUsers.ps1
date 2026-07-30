@@ -1252,6 +1252,87 @@ try {
         -SecondColor "var(--amber)" `
         -ThirdColor "var(--red)"
 
+    $DistinctModels = @(
+        $FinalDetails |
+        ForEach-Object {
+            if (-not [string]::IsNullOrWhiteSpace([string]$_.Model)) {
+                ([string]$_.Model).Trim()
+            }
+        } |
+        Sort-Object -Unique
+    )
+
+    $HasUnknownModel = @(
+        $FinalDetails |
+        Where-Object { [string]::IsNullOrWhiteSpace([string]$_.Model) }
+    ).Count -gt 0
+
+    $UserModelFiltersBuilder = [System.Text.StringBuilder]::new()
+    $PasskeyModelFiltersBuilder = [System.Text.StringBuilder]::new()
+
+    foreach ($Model in $DistinctModels) {
+        $EncodedModel = ConvertTo-HtmlText -Value $Model
+
+        [void]$UserModelFiltersBuilder.AppendLine(
+            '<label class="check-filter"><input class="user-filter" type="checkbox" data-filter="model" value="{0}">{0}</label>' -f
+            $EncodedModel
+        )
+        [void]$PasskeyModelFiltersBuilder.AppendLine(
+            '<label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="model" value="{0}">{0}</label>' -f
+            $EncodedModel
+        )
+    }
+
+    if ($HasUnknownModel) {
+        [void]$UserModelFiltersBuilder.AppendLine(
+            '<label class="check-filter"><input class="user-filter" type="checkbox" data-filter="model" value="__unknown__">Unknown</label>'
+        )
+        [void]$PasskeyModelFiltersBuilder.AppendLine(
+            '<label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="model" value="__unknown__">Unknown</label>'
+        )
+    }
+
+    if ($DistinctModels.Count -eq 0 -and -not $HasUnknownModel) {
+        [void]$UserModelFiltersBuilder.AppendLine(
+            '<span class="filter-empty">No models available</span>'
+        )
+        [void]$PasskeyModelFiltersBuilder.AppendLine(
+            '<span class="filter-empty">No models available</span>'
+        )
+    }
+
+    $UserModelFilterValuesByUserId = @{}
+
+    foreach ($DetailRow in $FinalDetails) {
+        $ModelUserId = [string]$DetailRow.UserId
+
+        if ([string]::IsNullOrWhiteSpace($ModelUserId)) {
+            continue
+        }
+
+        if (-not $UserModelFilterValuesByUserId.ContainsKey($ModelUserId)) {
+            $UserModelFilterValuesByUserId[$ModelUserId] = @()
+        }
+
+        $ModelFilterValue = if (
+            [string]::IsNullOrWhiteSpace([string]$DetailRow.Model)
+        ) {
+            "__unknown__"
+        }
+        else {
+            ([string]$DetailRow.Model).Trim()
+        }
+
+        if (
+            $ModelFilterValue -notin
+            @($UserModelFilterValuesByUserId[$ModelUserId])
+        ) {
+            $UserModelFilterValuesByUserId[$ModelUserId] = @(
+                $UserModelFilterValuesByUserId[$ModelUserId]
+            ) + $ModelFilterValue
+        }
+    }
+
     $UserRowsBuilder = [System.Text.StringBuilder]::new()
 
     foreach ($Row in $FinalSummary) {
@@ -1294,8 +1375,21 @@ try {
             }
         }
 
+        $RowUserId = [string]$Row.UserId
+        $RowModelFilterValues = "__unknown__"
+
+        if (
+            -not [string]::IsNullOrWhiteSpace($RowUserId) -and
+            $UserModelFilterValuesByUserId.ContainsKey($RowUserId)
+        ) {
+            $RowModelFilterValues = @(
+                $UserModelFilterValuesByUserId[$RowUserId] |
+                Sort-Object
+            ) -join ";"
+        }
+
         $RowHtml = @"
-<tr data-row="true" data-user-type="$(ConvertTo-HtmlText -Value $Row.UserType -Fallback 'unknown')" data-admin="$(([string]$Row.IsAdmin).ToLowerInvariant())">
+<tr data-row="true" data-user-type="$(ConvertTo-HtmlText -Value $Row.UserType -Fallback 'unknown')" data-admin="$(([string]$Row.IsAdmin).ToLowerInvariant())" data-models="$(ConvertTo-HtmlText -Value $RowModelFilterValues -Fallback '__unknown__')">
     <td data-sort="$(ConvertTo-HtmlText -Value $Row.DisplayName)"><strong>$(ConvertTo-HtmlText -Value $Row.DisplayName)</strong></td>
     <td data-sort="$(ConvertTo-HtmlText -Value $Row.UserPrincipalName)">$(ConvertTo-HtmlText -Value $Row.UserPrincipalName)</td>
     <td>$UserTypePill</td>
@@ -1346,7 +1440,7 @@ try {
         }
 
         $RowHtml = @"
-<tr data-row="true" data-user-type="$(ConvertTo-HtmlText -Value $Row.UserType -Fallback 'unknown')" data-admin="$(([string]$Row.IsAdmin).ToLowerInvariant())" data-passkey-type="$(ConvertTo-HtmlText -Value $Row.PasskeyType -Fallback 'unknown')" data-attestation="$(ConvertTo-HtmlText -Value $Row.AttestationLevel -Fallback 'unknown')">
+<tr data-row="true" data-user-type="$(ConvertTo-HtmlText -Value $Row.UserType -Fallback 'unknown')" data-admin="$(([string]$Row.IsAdmin).ToLowerInvariant())" data-passkey-type="$(ConvertTo-HtmlText -Value $Row.PasskeyType -Fallback 'unknown')" data-attestation="$(ConvertTo-HtmlText -Value $Row.AttestationLevel -Fallback 'unknown')" data-model="$(ConvertTo-HtmlText -Value $Row.Model -Fallback '')">
     <td data-sort="$(ConvertTo-HtmlText -Value $Row.DisplayName)"><strong>$(ConvertTo-HtmlText -Value $Row.DisplayName)</strong></td>
     <td data-sort="$(ConvertTo-HtmlText -Value $Row.UserPrincipalName)">$(ConvertTo-HtmlText -Value $Row.UserPrincipalName)</td>
     <td>$AdminPill</td>
@@ -1387,7 +1481,7 @@ try {
 .toolbar input[type="search"] { flex:1 1 360px; }
 .toolbar .btn { min-height:38px; align-self:center; }
 .filter-group { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-height:38px; padding:5px 7px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); }
-.filter-group-title { margin:0 3px 0 1px; color:var(--muted); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.045em; white-space:nowrap; }
+.filter-group-title { margin:0 3px 0 1px; color:var(--muted); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.045em; white-space:nowrap; } .model-filter-group { max-width:100%; max-height:116px; overflow:auto; align-content:flex-start; } .filter-empty { padding:3px 8px; color:var(--muted); font-size:11.5px; font-style:italic; }
 .check-filter { position:relative; display:inline-flex; align-items:center; gap:6px; min-height:26px; padding:3px 8px; background:var(--surface); border:1px solid var(--border); border-radius:999px; color:var(--text); font-size:11.5px; font-weight:600; cursor:pointer; user-select:none; transition:.15s ease; }
 .check-filter:hover { background:var(--surface3); }
 .check-filter:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:2px; }
@@ -1470,13 +1564,17 @@ th[aria-sort="descending"]::after { content:" ▼"; color:var(--accent); }
       <input id="userSearch" type="search" placeholder="Search display name, UPN, model, or passkey...">
       <div class="filter-group" role="group" aria-label="User type filters">
         <span class="filter-group-title">User type</span>
-        <label class="check-filter"><input class="user-filter" type="checkbox" data-filter="userType" value="member" checked>Members</label>
-        <label class="check-filter"><input class="user-filter" type="checkbox" data-filter="userType" value="guest" checked>Guests</label>
+        <label class="check-filter"><input class="user-filter" type="checkbox" data-filter="userType" value="member">Members</label>
+        <label class="check-filter"><input class="user-filter" type="checkbox" data-filter="userType" value="guest">Guests</label>
       </div>
       <div class="filter-group" role="group" aria-label="Privilege filters">
         <span class="filter-group-title">Privilege</span>
-        <label class="check-filter"><input class="user-filter" type="checkbox" data-filter="admin" value="true" checked>Administrators</label>
-        <label class="check-filter"><input class="user-filter" type="checkbox" data-filter="admin" value="false" checked>Standard users</label>
+        <label class="check-filter"><input class="user-filter" type="checkbox" data-filter="admin" value="true">Administrators</label>
+        <label class="check-filter"><input class="user-filter" type="checkbox" data-filter="admin" value="false">Standard users</label>
+      </div>
+      <div class="filter-group model-filter-group" role="group" aria-label="Model filters">
+        <span class="filter-group-title">Models</span>
+        {{USER_MODEL_FILTERS}}
       </div>
       <button class="btn" id="userReset" type="button">Reset filters</button>
       <div class="table-meta" id="userCount">{{TOTAL_USERS}} of {{TOTAL_USERS}} users</div>
@@ -1497,20 +1595,24 @@ th[aria-sort="descending"]::after { content:" ▼"; color:var(--accent); }
       <input id="passkeySearch" type="search" placeholder="Search user, passkey name, model, or AAGUID...">
       <div class="filter-group" role="group" aria-label="Passkey type filters">
         <span class="filter-group-title">Passkey type</span>
-        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="passkeyType" value="devicebound" checked>Device-bound</label>
-        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="passkeyType" value="synced" checked>Synced</label>
-        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="passkeyType" value="unknown" checked>Unknown</label>
+        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="passkeyType" value="devicebound">Device-bound</label>
+        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="passkeyType" value="synced">Synced</label>
+        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="passkeyType" value="unknown">Unknown</label>
       </div>
       <div class="filter-group" role="group" aria-label="Attestation filters">
         <span class="filter-group-title">Attestation</span>
-        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="attestation" value="attested" checked>Attested</label>
-        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="attestation" value="notattested" checked>Not attested</label>
-        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="attestation" value="unknown" checked>Unknown</label>
+        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="attestation" value="attested">Attested</label>
+        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="attestation" value="notattested">Not attested</label>
+        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="attestation" value="unknown">Unknown</label>
       </div>
       <div class="filter-group" role="group" aria-label="Privilege filters">
         <span class="filter-group-title">Privilege</span>
-        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="admin" value="true" checked>Administrators</label>
-        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="admin" value="false" checked>Standard users</label>
+        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="admin" value="true">Administrators</label>
+        <label class="check-filter"><input class="passkey-filter" type="checkbox" data-filter="admin" value="false">Standard users</label>
+      </div>
+      <div class="filter-group model-filter-group" role="group" aria-label="Model filters">
+        <span class="filter-group-title">Models</span>
+        {{PASSKEY_MODEL_FILTERS}}
       </div>
       <button class="btn" id="passkeyReset" type="button">Reset filters</button>
       <div class="table-meta" id="passkeyCount">{{TOTAL_PASSKEYS}} of {{TOTAL_PASSKEYS}} passkeys</div>
@@ -1612,8 +1714,27 @@ th[aria-sort="descending"]::after { content:" ▼"; color:var(--accent); }
     );
   }
 
-  function matchesCheckedValue(checkedValues, rowValue) {
-    return checkedValues.has(normalize(rowValue));
+  function matchesOptionalCheckedValue(checkedValues, rowValue) {
+    return checkedValues.size === 0 || checkedValues.has(normalize(rowValue));
+  }
+
+  function normalizeModel(value) {
+    const normalized = normalize(value);
+    return normalized || '__unknown__';
+  }
+
+  function matchesOptionalModels(checkedModels, rowModelsValue) {
+    if (checkedModels.size === 0) return true;
+
+    const rowModels = (rowModelsValue || '')
+      .split(';')
+      .map(normalizeModel)
+      .filter(function (value, index, values) {
+        return value && values.indexOf(value) === index;
+      });
+
+    if (rowModels.length === 0) rowModels.push('__unknown__');
+    return rowModels.some(function (model) { return checkedModels.has(model); });
   }
 
   function setupUserFilters() {
@@ -1628,13 +1749,15 @@ th[aria-sort="descending"]::after { content:" ▼"; color:var(--accent); }
       const query = normalize(search.value);
       const selectedTypes = getCheckedValues(toolbar, 'userType');
       const selectedAdminValues = getCheckedValues(toolbar, 'admin');
+      const selectedModels = getCheckedValues(toolbar, 'model');
       let visible = 0;
 
       rows.forEach(function (row) {
         const matchesSearch = !query || normalize(row.textContent).includes(query);
-        const matchesType = matchesCheckedValue(selectedTypes, row.dataset.userType);
-        const matchesAdmin = matchesCheckedValue(selectedAdminValues, row.dataset.admin);
-        const show = matchesSearch && matchesType && matchesAdmin;
+        const matchesType = matchesOptionalCheckedValue(selectedTypes, row.dataset.userType);
+        const matchesAdmin = matchesOptionalCheckedValue(selectedAdminValues, row.dataset.admin);
+        const matchesModel = matchesOptionalModels(selectedModels, row.dataset.models);
+        const show = matchesSearch && matchesType && matchesAdmin && matchesModel;
         row.classList.toggle('hidden-row', !show);
         if (show) visible++;
       });
@@ -1649,7 +1772,7 @@ th[aria-sort="descending"]::after { content:" ▼"; color:var(--accent); }
 
     document.getElementById('userReset').addEventListener('click', function () {
       search.value = '';
-      checkboxes.forEach(function (checkbox) { checkbox.checked = true; });
+      checkboxes.forEach(function (checkbox) { checkbox.checked = false; });
       apply();
     });
 
@@ -1681,14 +1804,16 @@ th[aria-sort="descending"]::after { content:" ▼"; color:var(--accent); }
       const selectedTypes = getCheckedValues(toolbar, 'passkeyType');
       const selectedAttestations = getCheckedValues(toolbar, 'attestation');
       const selectedAdminValues = getCheckedValues(toolbar, 'admin');
+      const selectedModels = getCheckedValues(toolbar, 'model');
       let visible = 0;
 
       rows.forEach(function (row) {
         const matchesSearch = !query || normalize(row.textContent).includes(query);
-        const matchesType = selectedTypes.has(normalizedType(row.dataset.passkeyType));
-        const matchesAttestation = selectedAttestations.has(normalizedAttestation(row.dataset.attestation));
-        const matchesAdmin = matchesCheckedValue(selectedAdminValues, row.dataset.admin);
-        const show = matchesSearch && matchesType && matchesAttestation && matchesAdmin;
+        const matchesType = selectedTypes.size === 0 || selectedTypes.has(normalizedType(row.dataset.passkeyType));
+        const matchesAttestation = selectedAttestations.size === 0 || selectedAttestations.has(normalizedAttestation(row.dataset.attestation));
+        const matchesAdmin = matchesOptionalCheckedValue(selectedAdminValues, row.dataset.admin);
+        const matchesModel = selectedModels.size === 0 || selectedModels.has(normalizeModel(row.dataset.model));
+        const show = matchesSearch && matchesType && matchesAttestation && matchesAdmin && matchesModel;
         row.classList.toggle('hidden-row', !show);
         if (show) visible++;
       });
@@ -1703,7 +1828,7 @@ th[aria-sort="descending"]::after { content:" ▼"; color:var(--accent); }
 
     document.getElementById('passkeyReset').addEventListener('click', function () {
       search.value = '';
-      checkboxes.forEach(function (checkbox) { checkbox.checked = true; });
+      checkboxes.forEach(function (checkbox) { checkbox.checked = false; });
       apply();
     });
 
@@ -1741,6 +1866,8 @@ th[aria-sort="descending"]::after { content:" ▼"; color:var(--accent); }
         "{{ATTESTATION_GRADIENT}}"   = $AttestationGradient
         "{{TENANT_ID}}"              = ConvertTo-HtmlText -Value $ConnectedTenantId
         "{{ACCOUNT}}"                = ConvertTo-HtmlText -Value $ConnectedAccount
+        "{{USER_MODEL_FILTERS}}"     = $UserModelFiltersBuilder.ToString()
+        "{{PASSKEY_MODEL_FILTERS}}"  = $PasskeyModelFiltersBuilder.ToString()
         "{{USER_ROWS}}"              = $UserRowsBuilder.ToString()
         "{{PASSKEY_ROWS}}"           = $PasskeyRowsBuilder.ToString()
     }
