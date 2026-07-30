@@ -2,7 +2,8 @@
 
 ## 📝 Description
 
-    Generates CSV and interactive HTML reports for enabled Microsoft Entra ID users who have at least one currently registered passkey (FIDO2) method.
+    Generates CSV and interactive HTML reports for enabled Microsoft Entra ID users
+    who have at least one currently registered passkey (FIDO2) method.
 
     - Connects interactively to Microsoft Graph.
     - Reuses an already-loaded Microsoft.Graph.Authentication module.
