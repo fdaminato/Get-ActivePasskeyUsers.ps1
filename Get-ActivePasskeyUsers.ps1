@@ -32,7 +32,6 @@
     .\Get-ActivePasskeyUsers.ps1 `
         -TenantId "XXXXXXX-52bc-4575-a1c7-6ff0f2802e24" `
         -OpenHtml
-        
 #>
 
 [CmdletBinding()]
