@@ -20,8 +20,4 @@
 
 Use .\Get-ActivePasskeyUsers.ps1 -TenantId "TENANTID" -OpenHtml
 
-## ⚡ Exemple 2
-
-```bash
-
-Use .\Get-ActivePasskeyUsers.ps1 -TenantId "contoso.onmicrosoft.com" -OpenHtml
+or .\Get-ActivePasskeyUsers.ps1 -TenantId "contoso.onmicrosoft.com" -OpenHtml
