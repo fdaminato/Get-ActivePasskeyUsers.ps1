@@ -25,18 +25,14 @@
 
 .EXAMPLE
     .\Get-ActivePasskeyUsers.ps1 `
-        -TenantId "aea614d3-52bc-4575-a1c7-6ff0f2802e24"
-
-.EXAMPLE
-    .\Get-ActivePasskeyUsers.ps1 `
-        -TenantId "aea614d3-52bc-4575-a1c7-6ff0f2802e24" `
+        -TenantId "contoso.onmicrosoft.com" `
         -OpenHtml
 
 .EXAMPLE
     .\Get-ActivePasskeyUsers.ps1 `
-        -TenantId "aea614d3-52bc-4575-a1c7-6ff0f2802e24" `
-        -CsvPath "C:\Reports\Active-Passkey-Users.csv" `
-        -HtmlPath "C:\Reports\Active-Passkey-Users.html"
+        -TenantId "XXXXXXX-52bc-4575-a1c7-6ff0f2802e24" `
+        -OpenHtml
+        
 #>
 
 [CmdletBinding()]
