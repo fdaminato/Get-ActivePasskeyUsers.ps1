@@ -1,5 +1,3 @@
-
-
 ## 📝 Description
 
     Generates CSV and interactive HTML reports for enabled Microsoft Entra ID users
