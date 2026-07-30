@@ -19,3 +19,7 @@
 ```bash
 
 Use .\Get-ActivePasskeyUsers.ps1 -TenantId "TENANTID" -OpenHtml
+
+```bash
+
+Use .\Get-ActivePasskeyUsers.ps1 -TenantId "contoso.onmicrosoft.com" -OpenHtml
