@@ -14,11 +14,13 @@
         * Failure CSV, when applicable
         * Standalone interactive HTML dashboard
 
-## ⚡ Quick Start
+## ⚡ Exemple 1
 
 ```bash
 
 Use .\Get-ActivePasskeyUsers.ps1 -TenantId "TENANTID" -OpenHtml
+
+## ⚡ Exemple 2
 
 ```bash
 
